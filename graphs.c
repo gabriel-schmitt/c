@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define N 15
+#define N 4
 
 typedef int **Graph;
 
@@ -41,7 +41,7 @@ void fillGraph(Graph G, int n, int range, int min) {
 }
 
 int *bfs(Graph G, int n, int iv) {
-    int level[n];
+    int *level = (int *)malloc(n * sizeof(int));
     int i;
     for (i=0;i<n;i++) level[i] = -1;
     int queue[n], head=0, tail=1;
@@ -49,20 +49,18 @@ int *bfs(Graph G, int n, int iv) {
     level[iv] = 0;
     while(head < tail) {
         int v = queue[head++];
-        printf("%d: ", v);
         for(i=0;i<n;i++)
             if (G[v][i] && level[i] == -1) {
-                printf("%d ", i);
                 level[i] = level[v] + 1;
                 queue[tail++] = i;
             }
-        printf("\n");
     }
 
-    for (i=0;i<n;i++)
+    for (i=0;i<n;i++) {
         if (level[i] != -1)
             break;
         return NULL;
+    }
 
     return level;
 }
@@ -75,8 +73,9 @@ int connectedComponents(Graph G, int n, int iv) {
     cc++;
 
     int v = iv;
-
+    int count = 0;
     while (1) {
+        printf("\nLoop: %d", ++count);
         int *level = bfs(G, n, v);
         int i;
         for (i=0;i<n;i++) 
@@ -85,8 +84,18 @@ int connectedComponents(Graph G, int n, int iv) {
                 v = i;
                 continue;
             }
+        free(level);
         break;
     }
+
+    return cc;
+}
+
+void freeGraph(Graph G, int n) {
+    int i;
+    for (i=0;i<n;i++)
+        free(G[i]);
+    free(G);
 }
 
 int main() {
@@ -96,7 +105,9 @@ int main() {
 
     printGraph(G, N);
 
-    connectedComponents(G, N, 0);
+    printf("\nComponentes conexas: %d", connectedComponents(G, N, 0));
+
+    freeGraph(G, N);
 
     printf("\n\nFim do programa.");
 
