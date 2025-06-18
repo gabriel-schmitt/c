@@ -1,4 +1,6 @@
-// https://chatgpt.com/share/684e2fc0-7590-8002-8a60-89ca50cc7619
+// 825667
+
+// Os Icosaedros do Lagarto - URI Online Judge 2155
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,8 +15,33 @@ double dist[N+1][N+1];
 double dp[1 << N][N+1];
 int pai[1 << N][N+1];
 
+// Adicione para armazenar o caminho parcial de cada estado
+int caminhoDP[1 << N][N+1][N+1]; // [máscara][último][posição]
+int tamCaminhoDP[1 << N][N+1];
+
 double menorCusto;
 int ultimoVertice;
+
+int melhorCaminho[N+2]; // caminho lexicograficamente menor
+int caminhoAtual[N+2];  // caminho temporário
+int tamMelhorCaminho;
+
+void salvaCaminho(int s, int ultimo, int subcon, int *idx) {
+    if (subcon == 0) {
+        caminhoAtual[(*idx)++] = s;
+        return;
+    }
+    salvaCaminho(s, pai[subcon][ultimo], subcon ^ (1 << (ultimo - 1)), idx);
+    caminhoAtual[(*idx)++] = ultimo;
+}
+
+int comparaCaminho(int len) {
+    for (int i = 0; i < len; i++) {
+        if (caminhoAtual[i] < melhorCaminho[i]) return -1;
+        if (caminhoAtual[i] > melhorCaminho[i]) return 1;
+    }
+    return 0;
+}
 
 void caminhoHamiltoniano(int s) {
     int subcon, i, j;
@@ -23,56 +50,87 @@ void caminhoHamiltoniano(int s) {
         for (i = 1; i <= N; i++) {
             dp[subcon][i] = INF;
             pai[subcon][i] = -1;
+            tamCaminhoDP[subcon][i] = 0;
         }
 
     for (i = 1; i <= N; i++) {
         if (i == s) continue;
-        dp[1 << (i - 1)][i] = dist[s][i]; // 1 << (i - 1) traduz para o subcon que só pussui i
-        pai[1 << (i - 1)][i] = s; // o pai de i no subcon é s
+        dp[1 << (i - 1)][i] = dist[s][i];
+        pai[1 << (i - 1)][i] = s;
+        caminhoDP[1 << (i - 1)][i][0] = s;
+        caminhoDP[1 << (i - 1)][i][1] = i;
+        tamCaminhoDP[1 << (i - 1)][i] = 2;
     }
 
     for (subcon = 1; subcon < (1 << N); subcon++)
         for (i = 1; i <= N; i++) {
-            if (!(subcon & (1 << (i - 1)))) continue; // se i não está no subconjunto
-
+            if (!(subcon & (1 << (i - 1)))) continue;
             for (j = 1; j <= N; j++) {
-                if (j == i || !(subcon & (1 << (j - 1)))) continue; // se j não está no subconjunto ou é igual a i
-
-                int subconSemI = subcon ^ (1 << (i - 1)); // remove i do subconjunto
+                if (j == i || !(subcon & (1 << (j - 1)))) continue;
+                int subconSemI = subcon ^ (1 << (i - 1));
                 double novoCusto = dp[subconSemI][j] + dist[j][i];
-
                 if (novoCusto < dp[subcon][i]) {
-                    dp[subcon][i] = novoCusto; // atualiza o custo mínimo
-                    pai[subcon][i] = j; // atualiza o pai de i no subconjunto
-                } else if (fabs(novoCusto - dp[subcon][i]) < 1e-9) { // empate de custo
-                    if (j < pai[subcon][i] || pai[subcon][i] == -1) { // verifica ordem lexicográfica
+                    dp[subcon][i] = novoCusto;
+                    pai[subcon][i] = j;
+                    // Copia caminho anterior e adiciona i
+                    int tam = tamCaminhoDP[subconSemI][j];
+                    for (int k = 0; k < tam; k++)
+                        caminhoDP[subcon][i][k] = caminhoDP[subconSemI][j][k];
+                    caminhoDP[subcon][i][tam] = i;
+                    tamCaminhoDP[subcon][i] = tam + 1;
+                } else if (fabs(novoCusto - dp[subcon][i]) < 1e-9) {
+                    // Empate: compara caminhos
+                    int tamA = tamCaminhoDP[subconSemI][j];
+                    int tamB = tamCaminhoDP[subcon][i];
+                    int menor = 0;
+                    for (int k = 0; k < tamA; k++) {
+                        if (k >= tamB) { menor = -1; break; }
+                        if (caminhoDP[subconSemI][j][k] < caminhoDP[subcon][i][k]) { menor = -1; break; }
+                        if (caminhoDP[subconSemI][j][k] > caminhoDP[subcon][i][k]) { menor = 1; break; }
+                    }
+                    if (menor == 0 && tamA < tamB) menor = -1;
+                    if (menor < 0) {
                         pai[subcon][i] = j;
+                        for (int k = 0; k < tamA; k++)
+                            caminhoDP[subcon][i][k] = caminhoDP[subconSemI][j][k];
+                        caminhoDP[subcon][i][tamA] = i;
+                        tamCaminhoDP[subcon][i] = tamA + 1;
                     }
                 }
             }
         }
 
-        for (i = 1; i <= N; i++) {
-            if (i == s) continue; // sem o vértice s
-            double custo = dp[((1 << N) - 1) ^ (1 << (s - 1))][i] + dist[i][s]; // onde (1 << N) - 1 ^ (1 << (s - 1)) significa o subconjunto com todos os vértices menos uma máscara que tira o vértice s
-            if (custo < menorCusto) {
-                menorCusto = custo;
-                ultimoVertice = i;
-            } else if (fabs(custo - menorCusto) < 1e-9) {
-                if (i < ultimoVertice || ultimoVertice == -1) {
-                    ultimoVertice = i;
-                }
+    menorCusto = INF;
+    ultimoVertice = -1;
+    tamMelhorCaminho = 0;
+    for (i = 1; i <= N; i++) {
+        if (i == s) continue;
+        double custo = dp[((1 << N) - 1) ^ (1 << (s - 1))][i] + dist[i][s];
+        int tam = tamCaminhoDP[((1 << N) - 1) ^ (1 << (s - 1))][i];
+        // Monta caminho completo
+        for (int k = 0; k < tam; k++)
+            caminhoAtual[k] = caminhoDP[((1 << N) - 1) ^ (1 << (s - 1))][i][k];
+        caminhoAtual[tam] = s;
+        int tamTotal = tam + 1;
+        if (custo < menorCusto) {
+            menorCusto = custo;
+            ultimoVertice = i;
+            tamMelhorCaminho = tamTotal;
+            for (int k = 0; k < tamTotal; k++) melhorCaminho[k] = caminhoAtual[k];
+        } else if (fabs(custo - menorCusto) < 1e-9) {
+            if (comparaCaminho(tamTotal) < 0) {
+                tamMelhorCaminho = tamTotal;
+                for (int k = 0; k < tamTotal; k++) melhorCaminho[k] = caminhoAtual[k];
             }
         }
+    }
 }
 
-void printaCaminho(int s, int ultimo, int subcon) {
-    if (subcon == 0) {
-        printf("%d->", s);
-        return;
+void printaMelhorCaminho() {
+    for (int i = 0; i < tamMelhorCaminho; i++) {
+        if (i > 0) printf("->");
+        printf("%d", melhorCaminho[i]);
     }
-    printaCaminho(s, pai[subcon][ultimo], subcon ^ (1 << (ultimo - 1)));
-    printf("%d->", ultimo);
 }
 
 double calculate_distance(int coord1[2], int coord2[2]) {
@@ -114,8 +172,8 @@ int main() {
         caminhoHamiltoniano(4);
 
         printf("Caso %d:\n", k + 1);
-        printaCaminho(4, ultimoVertice, ((1 << N) - 1) ^ (1 << (4 - 1)));
-        printf("4: %.5f\n", menorCusto);
+        printaMelhorCaminho();
+        printf(": %.5f\n", menorCusto);
     }
 
     return 0;
